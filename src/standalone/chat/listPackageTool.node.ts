@@ -3,7 +3,14 @@
 
 import * as vscode from 'vscode';
 import { IKernelProvider } from '../../kernels/types';
-import { getPackagesFromEnvsExtension, packageDefinition, sendPipListRequest } from './helper';
+import {
+    getPackagesFromEnvsExtension,
+    packageDefinition,
+    resolveNotebookFromFilePath,
+    sendPipListRequest
+} from './helper';
+import { IControllerRegistration } from '../../notebooks/controllers/types';
+import { ConfigurePythonNotebookTool } from './configureNotebook.python.node';
 
 export class ListPackageTool implements vscode.LanguageModelTool<IListPackagesParams> {
     public static toolName = 'notebook_list_packages';
@@ -16,7 +23,8 @@ export class ListPackageTool implements vscode.LanguageModelTool<IListPackagesPa
     }
 
     constructor(
-        private readonly kernelProvider: IKernelProvider //private readonly installer: IInstaller
+        private readonly kernelProvider: IKernelProvider,
+        private readonly controllerRegistration: IControllerRegistration
     ) {}
 
     async invoke(
@@ -29,12 +37,8 @@ export class ListPackageTool implements vscode.LanguageModelTool<IListPackagesPa
             throw new Error('notebookUri is a required parameter.');
         }
 
-        // TODO: handle other schemas
-        const uri = vscode.Uri.file(filePath);
-        const notebook = vscode.workspace.notebookDocuments.find((n) => n.uri.toString() === uri.toString());
-        if (!notebook) {
-            throw new Error(`Notebook ${filePath} not found.`);
-        }
+        const notebook = await resolveNotebookFromFilePath(filePath);
+        await new ConfigurePythonNotebookTool(this.kernelProvider, this.controllerRegistration).invoke(notebook, token);
         const kernel = this.kernelProvider.get(notebook);
         if (!kernel) {
             throw new Error(`No active kernel for notebook ${filePath}, A kernel needs to be selected.`);
@@ -51,9 +55,11 @@ export class ListPackageTool implements vscode.LanguageModelTool<IListPackagesPa
             packages = await getPackagesFromEnvsExtension(kernelUri);
         }
 
-        // TODO: There is an IInstaller service available, but currently only lists info for a single package.
-        // It may also depend on the environment extension?
-        packages = await sendPipListRequest(kernel, token);
+        if (!packages) {
+            // TODO: There is an IInstaller service available, but currently only lists info for a single package.
+            // It may also depend on the environment extension?
+            packages = await sendPipListRequest(kernel, token);
+        }
 
         if (!packages) {
             throw new Error(`Unable to list packages for notebook ${filePath}.`);
@@ -64,11 +70,25 @@ export class ListPackageTool implements vscode.LanguageModelTool<IListPackagesPa
         return new vscode.LanguageModelToolResult([new vscode.LanguageModelTextPart(finalMessageString)]);
     }
 
-    prepareInvocation(
-        _options: vscode.LanguageModelToolInvocationPrepareOptions<IListPackagesParams>,
+    async prepareInvocation(
+        options: vscode.LanguageModelToolInvocationPrepareOptions<IListPackagesParams>,
         _token: vscode.CancellationToken
-    ): vscode.ProviderResult<vscode.PreparedToolInvocation> {
-        return undefined;
+    ): Promise<vscode.PreparedToolInvocation> {
+        const notebook = await resolveNotebookFromFilePath(options.input.filePath);
+
+        const controller = this.controllerRegistration.getSelected(notebook);
+        const kernel = this.kernelProvider.get(notebook);
+        if (!controller || !kernel || !kernel.startedAtLeastOnce) {
+            return {
+                confirmationMessages: {
+                    title: vscode.l10n.t(`Start Kernel and List Packages?`),
+                    message: vscode.l10n.t('The notebook kernel needs to be started before listing packages')
+                },
+                invocationMessage: vscode.l10n.t('Starting kernel and listing packages')
+            };
+        }
+
+        return { invocationMessage: vscode.l10n.t('Listing packages') };
     }
 }
 

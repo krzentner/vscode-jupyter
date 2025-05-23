@@ -13,7 +13,7 @@ import { getDisplayPath } from '../platform/common/platform/fs-paths.node';
 import { noop } from '../platform/common/utils/misc';
 import { INotebookEditorProvider, INotebookPythonEnvironmentService } from './types';
 import { getCachedEnvironment, getInterpreterInfo } from '../platform/interpreter/helpers';
-import type { Environment } from '@vscode/python-extension';
+import type { Environment, EnvironmentPath } from '@vscode/python-extension';
 import type { PythonEnvironment } from '../platform/pythonEnvironments/info';
 import { toPythonSafePath } from '../platform/common/utils/encoder';
 
@@ -52,7 +52,7 @@ export class NotebookPythonEnvironmentService extends DisposableBase implements 
         );
     }
 
-    public getPythonEnvironment(uri: Uri): Environment | undefined {
+    public getPythonEnvironment(uri: Uri): EnvironmentPath | undefined {
         const notebook = this.notebookEditorProvider.findAssociatedNotebookDocument(uri);
         return notebook ? this.notebookPythonEnvironments.get(notebook) : undefined;
     }
