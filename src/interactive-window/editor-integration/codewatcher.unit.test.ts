@@ -97,7 +97,8 @@ suite('Code Watcher Unit Tests', () => {
             debugJustMyCode: true,
             widgetScriptSources: [],
             interactiveWindowMode: 'single',
-            newCellOnRunLast: true
+            newCellOnRunLast: true,
+            startPort: 9_000,
         });
         debugService.setup((d) => d.activeDebugSession).returns(() => undefined);
 

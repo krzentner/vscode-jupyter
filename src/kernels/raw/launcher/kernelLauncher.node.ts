@@ -48,7 +48,7 @@ const PortFormatString = `kernelLauncherPortStart_{0}.tmp`;
 // If the selected interpreter doesn't have a kernel, it will find a kernel on disk and use that.
 @injectable()
 export class KernelLauncher implements IKernelLauncher {
-    private static startPortPromise = KernelLauncher.computeStartPort();
+    private static startPortPromise: Promise<number> | undefined;
     private portChain: Promise<number[]> | undefined;
     constructor(
         @inject(IProcessServiceFactory) private processExecutionFactory: IProcessServiceFactory,
@@ -64,10 +64,10 @@ export class KernelLauncher implements IKernelLauncher {
         @inject(IPlatformService) private readonly platformService: IPlatformService
     ) {}
 
-    private static async computeStartPort(): Promise<number> {
+    private static async computeStartPort(defaultStart: number): Promise<number> {
         if (isTestExecution()) {
             // Since multiple instances of a test may be running, write our best guess to a shared file
-            let portStart = 9_000;
+            let portStart = defaultStart;
             let result = 0;
             while (result === 0 && portStart < 65_000) {
                 try {
@@ -86,7 +86,7 @@ export class KernelLauncher implements IKernelLauncher {
 
             return result;
         } else {
-            return 9_000;
+            return defaultStart;
         }
     }
 
@@ -98,13 +98,16 @@ export class KernelLauncher implements IKernelLauncher {
         cancelToken: CancellationToken
     ): Promise<IKernelProcess> {
         logIPyKernelPath(resource, kernelConnectionMetadata, this.pythonExecFactory, cancelToken).catch(noop);
+        const jupyterSettings = this.configService.getSettings(resource);
         const stopWatch = new StopWatch();
         const tracker = getNotebookTelemetryTracker(resource)?.getConnection();
-        const connection = await raceCancellationError(cancelToken, this.getKernelConnection(kernelConnectionMetadata));
+        const connection = await raceCancellationError(
+            cancelToken,
+            this.getKernelConnection(kernelConnectionMetadata, jupyterSettings.startPort)
+        );
         tracker?.stop();
         // Create a new output channel for this kernel
         const baseName = resource ? path.basename(resource.fsPath) : '';
-        const jupyterSettings = this.configService.getSettings(resource);
         const outputChannel =
             jupyterSettings.logKernelOutputSeparately || jupyterSettings.development
                 ? window.createOutputChannel(DataScience.kernelConsoleOutputChannel(baseName), 'log')
@@ -179,11 +182,11 @@ export class KernelLauncher implements IKernelLauncher {
         return kernelProcess;
     }
 
-    private async chainGetConnectionPorts(): Promise<number[]> {
+    private async chainGetConnectionPorts(configuredStartPort: number): Promise<number[]> {
         if (this.portChain) {
             await this.portChain;
         }
-        this.portChain = this.getConnectionPorts();
+        this.portChain = this.getConnectionPorts(configuredStartPort);
         return this.portChain;
     }
 
@@ -199,7 +202,10 @@ export class KernelLauncher implements IKernelLauncher {
         return ports;
     }
 
-    private async getConnectionPorts(): Promise<number[]> {
+    private async getConnectionPorts(configuredStartPort: number): Promise<number[]> {
+        if (!KernelLauncher.startPortPromise) {
+            KernelLauncher.startPortPromise = KernelLauncher.computeStartPort(configuredStartPort);
+        }
         // Have to wait for static port lookup (it handles case where two VS code instances are running)
         const startPort = await KernelLauncher.startPortPromise;
 
@@ -208,9 +214,10 @@ export class KernelLauncher implements IKernelLauncher {
     }
 
     private async getKernelConnection(
-        kernelConnectionMetadata: LocalKernelSpecConnectionMetadata | PythonKernelConnectionMetadata
+        kernelConnectionMetadata: LocalKernelSpecConnectionMetadata | PythonKernelConnectionMetadata,
+        configuredStartPort: number
     ): Promise<IKernelConnection> {
-        const ports = await this.chainGetConnectionPorts();
+        const ports = await this.chainGetConnectionPorts(configuredStartPort);
         return {
             key: uuid(),
             signature_scheme: 'hmac-sha256',

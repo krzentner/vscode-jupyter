@@ -92,6 +92,7 @@ export interface IJupyterSettings {
     readonly excludeUserSitePackages: boolean;
     readonly enableExtendedPythonKernelCompletions: boolean;
     readonly formatStackTraces: boolean;
+    readonly startPort: number;
     /**
      * Trigger characters for Jupyter completion, per language.
      * This excludes the trigger characters for python.

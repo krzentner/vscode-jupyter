@@ -88,6 +88,7 @@ export class JupyterSettings implements IWatchableJupyterSettings {
     public enableExtendedPythonKernelCompletions: boolean = false;
     public formatStackTraces: boolean = false;
     public interactiveReplNotebook: boolean = false;
+    public startPort: number = 9_000;
     // Privates should start with _ so that they are not read from the settings.json
     private _changeEmitter = new EventEmitter<void>();
     private _workspaceRoot: Resource;

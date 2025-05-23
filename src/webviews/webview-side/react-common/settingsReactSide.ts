@@ -42,7 +42,8 @@ export function getDefaultSettings(): IJupyterExtraSettings {
         },
         runStartupCommands: '',
         debugJustMyCode: true,
-        widgetScriptSources: []
+        widgetScriptSources: [],
+        startPort: 9_000,
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

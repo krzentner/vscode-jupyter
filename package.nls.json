@@ -227,6 +227,7 @@
     "jupyter.configuration.jupyter.enableKernelCompletions.markdownDescription": "Enable code completions in Notebooks and Interactive Windows using results from the associated Jupyter Kernel.",
     "jupyter.configuration.jupyter.formatStackTraces.description": "Inject stack frame links into the stored traceback for the notebook.",
     "jupyter.configuration.jupyter.formatStackTraces.deprecationMessage": "This setting has been deprecated and will be removed in a future release.",
+    "jupyter.configuration.jupyter.startPort.description": "Beginning of TCP port range used for communicating with Jupyter kernels.",
     "DataScience.exportDialogTitle": {
         "message": "Export to Jupyter Notebook",
         "comment": ["{Locked='Notebook'}"]
